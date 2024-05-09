@@ -1,45 +1,60 @@
-#include "types.h"
-#include "param.h"
-#include "memlayout.h"
-#include "riscv.h"
-#include "defs.h"
+#include "types.h"       // Includes basic data types
+#include "param.h"       // Kernel parameters
+#include "memlayout.h"   // Memory layout of the kernel
+#include "riscv.h"       // RISC-V specific definitions
+#include "defs.h"        // Definitions of kernel functions and variables
 
-volatile static int started = 0;
+volatile static int started = 0; // Static flag to indicate if the kernel has started
 
-// start() jumps here in supervisor mode on all CPUs.
-void
-main()
-{
-  if(cpuid() == 0){
+// The main function is the entry point for the kernel.
+void main() {
+  // Check if the current CPU is the bootstrap processor (BSP)
+  if (cpuid() == 0) {
+    // Initialize the console for kernel messages
     consoleinit();
     printfinit();
+
+    // Print kernel boot messages
     printf("\n");
     printf("xv6 kernel is booting\n");
     printf("\n");
-    kinit();         // physical page allocator
-    kvminit();       // create kernel page table
-    kvminithart();   // turn on paging
-    procinit();      // process table
-    trapinit();      // trap vectors
-    trapinithart();  // install kernel trap vector
-    plicinit();      // set up interrupt controller
-    plicinithart();  // ask PLIC for device interrupts
-    binit();         // buffer cache
-    iinit();         // inode table
-    fileinit();      // file table
-    virtio_disk_init(); // emulated hard disk
-    userinit();      // first user process
+
+    // Initialize various kernel subsystems
+    kinit();         // Initialize physical page allocator
+    kvminit();       // Initialize kernel virtual memory
+    kvminithart();   // Enable paging
+    procinit();      // Initialize process table
+    trapinit();      // Initialize trap handling
+    trapinithart();  // Install kernel trap vector
+    plicinit();      // Initialize the Platform-Level Interrupt Controller (PLIC)
+    plicinithart();  // Configure PLIC for device interrupts
+    binit();         // Initialize buffer cache
+    iinit();         // Initialize inode table
+    fileinit();      // Initialize file table
+    virtio_disk_init(); // Initialize emulated hard disk
+    userinit();      // Start the first user process
+
+    // Synchronize memory accesses
     __sync_synchronize();
+
+    // Indicate that the kernel has started
     started = 1;
   } else {
-    while(started == 0)
-      ;
+    // For non-BSP CPUs, wait until the kernel has started
+    while (started == 0);
+
+    // Synchronize memory accesses
     __sync_synchronize();
+
+    // Print a message indicating that this CPU (hart) is starting
     printf("hart %d starting\n", cpuid());
-    kvminithart();    // turn on paging
-    trapinithart();   // install kernel trap vector
-    plicinithart();   // ask PLIC for device interrupts
+
+    // Initialize CPU-specific settings
+    kvminithart();    // Enable paging
+    trapinithart();   // Install kernel trap vector
+    plicinithart();   // Configure PLIC for device interrupts
   }
 
+  // Start the scheduler
   scheduler();        
 }
